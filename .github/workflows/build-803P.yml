@@ -109,7 +109,7 @@ jobs:
           echo "release_tag=803P-$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
           echo "status=success" >> $GITHUB_OUTPUT
 
-      - name: Upload firmware to releaseg | 上载要发布的固件
+      - name: Upload firmware to release | 上载要发布的固件
         uses: softprops/action-gh-release@master
         if: steps.tag.outputs.status == 'success' && !cancelled()
         env:
