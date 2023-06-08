@@ -1,4 +1,4 @@
-name: Build -803P
+name: Build 803P
 
 on:
   workflow_dispatch:
