@@ -1,4 +1,4 @@
-name: Build X86_64 IPv4 Version OpenWrt
+name: Build X86_64 803P
 
 on:
   repository_dispatch:
@@ -8,14 +8,9 @@ env:
   REPO_URL: https://github.com/coolsnowwolf/lede
   REPO_BRANCH: master
   FEEDS_CONF: feeds.conf.default
-  CONFIG_FILE: x86_64_ipv4.config
-  DIY_P1_SH: diy-part1.sh
-  DIY_P2_SH: x86_64-part2.sh
-  UPLOAD_BIN_DIR: false
-  UPLOAD_FIRMWARE: true
-  UPLOAD_COWTRANSFER: false
-  UPLOAD_WETRANSFER: false
-  UPLOAD_RELEASE: false
+  CONFIG_FILE: build/803P/803P.config
+  DIY_P1_SH: build/803P/diy-part1.sh
+  DIY_P2_SH: build/803P/diy-part2.sh
   TZ: Asia/Shanghai
 
 jobs:
@@ -29,20 +24,6 @@ jobs:
         echo "=============================================================================="
         df -hT
         echo "=============================================================================="
-
-    # - name: Reclaim the bytes
-    #   uses: data-intuitive/reclaim-the-bytes@v1
-    #   with:
-    #     remove-hosted-tool-cache: true
-    #     remove-go: false
-    #     remove-codeql: false
-    #     remove-powershell: false
-    #     remove-android-sdk: true
-    #     remove-haskell-ghc: true
-    #     remove-swift: true
-    #     remove-dotnet: true
-    #     remove-docker-images: true
-    #     remove-swap: true
 
     - name: "Optimize Disk Space"
       uses: "hugoalh/disk-space-optimizer-ghaction@v0.4.0"
@@ -74,10 +55,10 @@ jobs:
         df -hT
         echo "=============================================================================="
 
-    - name: Checkout
+    - name: Checkout | 检查项目分支
       uses: actions/checkout@main
 
-    - name: Initialization environment
+    - name: Initialization environment | 安装编译环境
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
@@ -96,25 +77,25 @@ jobs:
         sudo timedatectl set-timezone "$TZ"
         sudo chown $USER:$GROUPS $GITHUB_WORKSPACE
 
-    - name: Clone source code
+    - name: Clone source code | 下载固件源码
       working-directory: ./
       run: |
         git clone --depth=1 $REPO_URL -b $REPO_BRANCH openwrt
 
-    - name: Load custom feeds
+    - name: Load custom feeds| 加载自定义设置P1
       run: |
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
         chmod +x $DIY_P1_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
-    - name: Update feeds
+    - name: Update feeds | 更新订阅源
       run: cd openwrt && ./scripts/feeds update -a
 
-    - name: Install feeds
+    - name: Install feeds | 安装订阅源
       run: cd openwrt && ./scripts/feeds install -a
 
-    - name: Load custom configuration
+    - name: Load custom configuration | 加载自定义设置P2
       run: |
         [ -e files ] && mv files openwrt/files
         [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
@@ -122,7 +103,7 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: Download package
+    - name: Download package | 下载安装包
       id: package
       run: |
         cd openwrt
@@ -131,7 +112,7 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
-    - name: Compile the firmware
+    - name: Compile the firmware | 开始编译固件
       id: compile
       run: |
         cd openwrt
@@ -153,7 +134,7 @@ jobs:
         name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: openwrt/bin
 
-    - name: Organize files
+    - name: Organize files | 整理编译好的固件
       id: organize
       if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
@@ -162,7 +143,7 @@ jobs:
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: Upload firmware directory
+    - name: Upload firmware directory | 上传固件到github
       uses: actions/upload-artifact@main
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
@@ -187,7 +168,7 @@ jobs:
         echo "::warning file=wetransfer.com::$(cat wetransfer.log | grep https)"
         echo "url=$(cat wetransfer.log | grep https | cut -f3 -d" ")" >> $GITHUB_OUTPUT
 
-    - name: Generate release tag
+    - name: Generate release tag| 生成发布标签
       id: tag
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
@@ -197,7 +178,7 @@ jobs:
         [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: Upload firmware to release
+    - name: Upload firmware to release | 上载要发布的固件
       uses: softprops/action-gh-release@v1
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
@@ -207,13 +188,13 @@ jobs:
         body_path: release.txt
         files: ${{ env.FIRMWARE }}/*
 
-    - name: Delete workflow runs
+    - name: Delete workflow runs | 清理workflow
       uses: Mattraks/delete-workflow-runs@v2
       with:
         retain_days: 1
         keep_minimum_runs: 3
 
-    - name: Remove old Releases
+    - name: Remove old Releases | 清理Releases
       uses: dev-drprasad/delete-older-releases@v0.1.0
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       with:
